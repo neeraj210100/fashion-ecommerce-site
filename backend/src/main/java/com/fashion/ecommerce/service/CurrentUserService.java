@@ -1,5 +1,6 @@
 package com.fashion.ecommerce.service;
 
+import com.fashion.ecommerce.exception.NotFoundException;
 import com.fashion.ecommerce.repository.UserRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,7 @@ public class CurrentUserService {
     public Long requireUserId() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found"))
+                .orElseThrow(() -> new NotFoundException("Authenticated user not found"))
                 .getId();
     }
 

@@ -1,9 +1,11 @@
 package com.fashion.ecommerce.service;
 
+import com.fashion.ecommerce.domain.ProductCategory;
 import com.fashion.ecommerce.dto.CategoryDto;
 import com.fashion.ecommerce.dto.PageResponse;
 import com.fashion.ecommerce.dto.ProductDto;
-import com.fashion.ecommerce.repository.CategoryRepository;
+import com.fashion.ecommerce.exception.BadRequestException;
+import com.fashion.ecommerce.exception.NotFoundException;
 import com.fashion.ecommerce.repository.ProductRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -11,28 +13,27 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
 public class CatalogService {
 
-    private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final CatalogMapper mapper;
 
-    public CatalogService(
-            CategoryRepository categoryRepository,
-            ProductRepository productRepository,
-            CatalogMapper mapper
-    ) {
-        this.categoryRepository = categoryRepository;
+    public CatalogService(ProductRepository productRepository, CatalogMapper mapper) {
         this.productRepository = productRepository;
         this.mapper = mapper;
     }
 
     @Transactional(readOnly = true)
     public List<CategoryDto> listCategories() {
-        return categoryRepository.findAll(Sort.by("name")).stream().map(mapper::toDto).toList();
+        return Arrays.stream(ProductCategory.values())
+                .sorted(Comparator.comparing(ProductCategory::getDisplayName))
+                .map(mapper::toDto)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -44,7 +45,11 @@ public class CatalogService {
                     .findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(q.trim(), q.trim(), pr)
                     .map(mapper::toDto);
         } else if (categorySlug != null && !categorySlug.isBlank()) {
-            result = productRepository.findByCategorySlug(categorySlug, pr).map(mapper::toDto);
+            ProductCategory cat = ProductCategory.fromSlug(categorySlug);
+            if (cat == null) {
+                throw new BadRequestException("Unknown category: " + categorySlug);
+            }
+            result = productRepository.findByCategory(cat, pr).map(mapper::toDto);
         } else {
             result = productRepository.findAll(pr).map(mapper::toDto);
         }
@@ -73,6 +78,6 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public ProductDto getBySlug(String slug) {
         return productRepository.findBySlug(slug).map(mapper::toDto)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+                .orElseThrow(() -> new NotFoundException("Product not found"));
     }
 }

@@ -8,6 +8,8 @@ import com.fashion.ecommerce.domain.Cart;
 import com.fashion.ecommerce.domain.CartItem;
 import com.fashion.ecommerce.domain.Product;
 import com.fashion.ecommerce.domain.User;
+import com.fashion.ecommerce.exception.BadRequestException;
+import com.fashion.ecommerce.exception.NotFoundException;
 import com.fashion.ecommerce.repository.CartRepository;
 import com.fashion.ecommerce.repository.ProductRepository;
 import com.fashion.ecommerce.repository.UserRepository;
@@ -15,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-//import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,7 +44,8 @@ public class CartService {
     public CartDto getOrCreateCart(Long userId) {
         Cart cart = cartRepository.findByUser_IdAndActiveTrue(userId)
                 .orElseGet(() -> {
-                    User user = userRepository.findById(userId).orElseThrow();
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new NotFoundException("User not found"));
                     Cart c = Cart.builder().user(user).active(true).items(new ArrayList<>()).build();
                     return cartRepository.save(c);
                 });
@@ -54,20 +56,21 @@ public class CartService {
     public CartDto addItem(Long userId, AddToCartRequest req) {
         Cart cart = cartRepository.findByUser_IdAndActiveTrue(userId)
                 .orElseGet(() -> {
-                    User user = userRepository.findById(userId).orElseThrow();
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new NotFoundException("User not found"));
                     Cart c = Cart.builder().user(user).active(true).items(new ArrayList<>()).build();
                     return cartRepository.save(c);
                 });
         Product product = productRepository.findById(req.productId())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+                .orElseThrow(() -> new NotFoundException("Product not found"));
         if (product.getStock() < req.quantity()) {
-            throw new IllegalArgumentException("Not enough stock");
+            throw new BadRequestException("Not enough stock");
         }
         for (CartItem line : cart.getItems()) {
             if (line.getProduct().getId().equals(product.getId())) {
                 int next = line.getQuantity() + req.quantity();
                 if (next > product.getStock()) {
-                    throw new IllegalArgumentException("Not enough stock");
+                    throw new BadRequestException("Not enough stock");
                 }
                 line.setQuantity(next);
                 return toDto(cartRepository.save(cart));
@@ -80,16 +83,17 @@ public class CartService {
 
     @Transactional
     public CartDto updateItem(Long userId, Long cartItemId, UpdateCartItemRequest req) {
-        Cart cart = cartRepository.findByUser_IdAndActiveTrue(userId).orElseThrow();
+        Cart cart = cartRepository.findByUser_IdAndActiveTrue(userId)
+                .orElseThrow(() -> new NotFoundException("Cart not found"));
         CartItem line = cart.getItems().stream()
                 .filter(i -> i.getId().equals(cartItemId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Cart item not found"));
+                .orElseThrow(() -> new NotFoundException("Cart item not found"));
         if (req.quantity() == 0) {
             cart.getItems().remove(line);
         } else {
             if (line.getProduct().getStock() < req.quantity()) {
-                throw new IllegalArgumentException("Not enough stock");
+                throw new BadRequestException("Not enough stock");
             }
             line.setQuantity(req.quantity());
         }

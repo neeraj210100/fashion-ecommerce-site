@@ -5,8 +5,11 @@ import com.fashion.ecommerce.dto.AuthResponse;
 import com.fashion.ecommerce.dto.RegisterRequest;
 import com.fashion.ecommerce.domain.Role;
 import com.fashion.ecommerce.domain.User;
+import com.fashion.ecommerce.exception.ConflictException;
+import com.fashion.ecommerce.exception.UnauthorizedException;
 import com.fashion.ecommerce.repository.UserRepository;
 import com.fashion.ecommerce.security.JwtService;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,7 +41,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("Email already registered");
+            throw new ConflictException("Email already registered");
         }
         User user = User.builder()
                 .email(request.email().toLowerCase().trim())
@@ -52,10 +55,14 @@ public class AuthService {
     }
 
     public AuthResponse login(AuthRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email().toLowerCase().trim(), request.password()));
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.email().toLowerCase().trim(), request.password()));
+        } catch (BadCredentialsException ex) {
+            throw new UnauthorizedException("Invalid email or password");
+        }
         User user = userRepository.findByEmail(request.email().toLowerCase().trim())
-                .orElseThrow();
+                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
         String token = jwtService.generateToken(user.getEmail(), user.getId());
         return new AuthResponse(token, user.getEmail(), user.getFullName(), user.getId());
     }

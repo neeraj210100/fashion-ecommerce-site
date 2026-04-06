@@ -10,6 +10,8 @@ import com.fashion.ecommerce.domain.OrderLine;
 import com.fashion.ecommerce.domain.OrderStatus;
 import com.fashion.ecommerce.domain.Product;
 import com.fashion.ecommerce.domain.User;
+import com.fashion.ecommerce.exception.BadRequestException;
+import com.fashion.ecommerce.exception.NotFoundException;
 import com.fashion.ecommerce.repository.CartRepository;
 import com.fashion.ecommerce.repository.OrderRepository;
 import com.fashion.ecommerce.repository.ProductRepository;
@@ -18,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-//import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,17 +48,19 @@ public class OrderService {
     @Transactional
     public OrderDto checkout(Long userId, CheckoutRequest req) {
         Cart cart = cartRepository.findByUser_IdAndActiveTrue(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Cart is empty"));
+                .orElseThrow(() -> new BadRequestException("Cart is empty"));
         if (cart.getItems().isEmpty()) {
-            throw new IllegalArgumentException("Cart is empty");
+            throw new BadRequestException("Cart is empty");
         }
-        User user = userRepository.findById(userId).orElseThrow();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
         BigDecimal total = BigDecimal.ZERO;
         List<OrderLine> lines = new ArrayList<>();
         for (CartItem ci : cart.getItems()) {
-            Product p = productRepository.findById(ci.getProduct().getId()).orElseThrow();
+            Product p = productRepository.findById(ci.getProduct().getId())
+                    .orElseThrow(() -> new NotFoundException("Product not found"));
             if (p.getStock() < ci.getQuantity()) {
-                throw new IllegalArgumentException("Insufficient stock for " + p.getName());
+                throw new BadRequestException("Insufficient stock for " + p.getName());
             }
             BigDecimal lineAmount = p.getPrice().multiply(BigDecimal.valueOf(ci.getQuantity()));
             total = total.add(lineAmount);
@@ -88,7 +91,8 @@ public class OrderService {
         }
         order = orderRepository.save(order);
         for (CartItem ci : cart.getItems()) {
-            Product p = productRepository.findById(ci.getProduct().getId()).orElseThrow();
+            Product p = productRepository.findById(ci.getProduct().getId())
+                    .orElseThrow(() -> new NotFoundException("Product not found"));
             p.setStock(p.getStock() - ci.getQuantity());
             productRepository.save(p);
         }
@@ -105,7 +109,7 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderDto getForUser(Long userId, Long orderId) {
         return orderRepository.findByIdAndUser_Id(orderId, userId).map(this::toDto)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+                .orElseThrow(() -> new NotFoundException("Order not found"));
     }
 
     private OrderDto toDto(CustomerOrder o) {
