@@ -6,6 +6,7 @@ import com.fashion.ecommerce.service.CurrentUserService;
 import com.fashion.ecommerce.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,5 +40,10 @@ public class OrderController {
     @GetMapping("/{id}")
     public OrderDto get(@PathVariable Long id) {
         return orderService.getForUser(currentUserService.requireUserId(), id);
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public OrderDto cancel(@PathVariable Long id) {
+        return orderService.cancel(currentUserService.requireUserId(), id);
     }
 }

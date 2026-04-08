@@ -128,6 +128,10 @@ export const api = {
   order(id: number): Promise<Order> {
     return request(`/api/orders/${id}`);
   },
+
+  cancelOrder(id: number): Promise<Order> {
+    return request(`/api/orders/${id}/cancel`, { method: "PATCH" });
+  },
 };
 
 export function formatMoney(value: number): string {

@@ -96,8 +96,8 @@ public class OrderService {
             p.setStock(p.getStock() - ci.getQuantity());
             productRepository.save(p);
         }
-        cart.getItems().clear();
-        cartRepository.save(cart);
+//        cart.getItems().clear();
+//        cartRepository.save(cart);
         return toDto(order);
     }
 
@@ -110,6 +110,28 @@ public class OrderService {
     public OrderDto getForUser(Long userId, Long orderId) {
         return orderRepository.findByIdAndUser_Id(orderId, userId).map(this::toDto)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
+    }
+
+    @Transactional
+    public OrderDto cancel(Long userId, Long orderId) {
+        CustomerOrder order = orderRepository.findByIdAndUser_Id(orderId, userId)
+                .orElseThrow(() -> new NotFoundException("Order not found"));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BadRequestException(
+                    "Only pending orders can be cancelled; current status is " + order.getStatus());
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+
+        for (OrderLine line : order.getLines()) {
+            Product product = productRepository.findById(line.getProduct().getId())
+                    .orElseThrow(() -> new NotFoundException("Product not found"));
+            product.setStock(product.getStock() + line.getQuantity());
+            productRepository.save(product);
+        }
+
+        return toDto(orderRepository.save(order));
     }
 
     private OrderDto toDto(CustomerOrder o) {

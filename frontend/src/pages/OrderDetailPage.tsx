@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, formatMoney } from "../api";
 import type { Order } from "../types";
@@ -9,6 +9,7 @@ export function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -28,6 +29,19 @@ export function OrderDetailPage() {
       alive = false;
     };
   }, [id]);
+
+  const handleCancel = useCallback(async () => {
+    if (!order || !window.confirm("Are you sure you want to cancel this order?")) return;
+    setCancelling(true);
+    try {
+      const updated = await api.cancelOrder(order.id);
+      setOrder(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to cancel order");
+    } finally {
+      setCancelling(false);
+    }
+  }, [order]);
 
   if (!id) return <p className="p-8 text-sm">Invalid order.</p>;
   if (loading) return <Spinner />;
@@ -57,6 +71,16 @@ export function OrderDetailPage() {
         Placed {new Date(order.createdAt).toLocaleString()} · Status{" "}
         <span className="text-ink">{order.status}</span>
       </p>
+
+      {order.status === "PENDING" && (
+        <button
+          onClick={handleCancel}
+          disabled={cancelling}
+          className="mt-4 rounded-sm border border-wine/30 px-4 py-2 text-sm font-medium text-wine transition hover:bg-wine hover:text-white disabled:opacity-50"
+        >
+          {cancelling ? "Cancelling…" : "Cancel Order"}
+        </button>
+      )}
 
       <div className="mt-10 space-y-3 rounded-sm border border-ink/10 bg-white/60 p-6">
         <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-ink/40">
