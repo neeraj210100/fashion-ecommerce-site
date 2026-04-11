@@ -11,6 +11,9 @@ app:
   jwt:
     secret: ${JWT_SECRET:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:rzp_test_Sc4C1J8HnxHdv7}
+    key-secret: ${RAZORPAY_KEY_SECRET:3Yv2qMy1qiVIDsKgQpBqnKqc}
 
 # OpenAPI / Swagger UI: http://localhost:8080/swagger-ui.html
 springdoc:
@@ -24,7 +27,7 @@ springdoc:
 spring:
   config:
     activate:
-      on-profile: dev
+      on-profile: test
   datasource:
     url: jdbc:h2:mem:fashion;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
@@ -66,18 +69,18 @@ spring:
           time_zone: UTC
 
 ---
-# MySQL (local / Workbench):
-#   1) Create schema `fashion`
-#   2) Create user + password (defaults below)
-#   3) Run with: SPRING_PROFILES_ACTIVE=mysql
+# MySQL (local / Sequel Ace):
+#   1) Open Sequel Ace -> connect to 127.0.0.1:3306
+#   2) Create schema `fashion_ecommerce`
+#   3) Run with: SPRING_PROFILES_ACTIVE=dev
 spring:
   config:
     activate:
-      on-profile: mysql
+      on-profile: dev
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:fashion_ecommerce}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:fashion_ecommerce}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:12345678}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2

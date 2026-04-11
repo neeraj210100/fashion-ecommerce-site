@@ -70,5 +70,6 @@ export type Order = {
   shippingPostalCode: string;
   shippingCountry: string;
   createdAt: string;
+  razorpayOrderId: string | null;
   lines: OrderLine[];
 };

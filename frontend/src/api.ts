@@ -132,6 +132,18 @@ export const api = {
   cancelOrder(id: number): Promise<Order> {
     return request(`/api/orders/${id}/cancel`, { method: "PATCH" });
   },
+
+  paymentConfig(): Promise<{ razorpayKeyId: string }> {
+    return request("/api/payments/config");
+  },
+
+  verifyPayment(body: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+  }): Promise<Order> {
+    return request("/api/payments/verify", { method: "POST", json: body });
+  },
 };
 
 export function formatMoney(value: number): string {

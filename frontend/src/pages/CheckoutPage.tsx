@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, formatMoney } from "../api";
 import { Button } from "../components/Button";
+import type { Order } from "../types";
+
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, handler: () => void) => void;
+    };
+  }
+}
 
 export function CheckoutPage() {
   const navigate = useNavigate();
@@ -27,23 +37,77 @@ export function CheckoutPage() {
     })();
   }, []);
 
+  function openRazorpay(order: Order, keyId: string) {
+    const options: Record<string, unknown> = {
+      key: keyId,
+      amount: Math.round(order.totalAmount * 100),
+      currency: "INR",
+      name: "Atelier Fashion",
+      description: `Order ${order.orderNumber}`,
+      order_id: order.razorpayOrderId,
+      handler: async (response: {
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+      }) => {
+        try {
+          await api.verifyPayment({
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature,
+          });
+          navigate(`/orders/${order.id}`, { replace: true });
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Payment verification failed"
+          );
+          setPending(false);
+        }
+      },
+      prefill: {
+        name: shippingName,
+      },
+      theme: {
+        color: "#6b2139",
+      },
+      modal: {
+        ondismiss: () => {
+          setError("Payment was not completed. Your order is saved as pending.");
+          setPending(false);
+        },
+      },
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setPending(true);
     try {
-      const order = await api.checkout({
-        shippingName,
-        shippingLine1,
-        shippingLine2: shippingLine2 || undefined,
-        shippingCity,
-        shippingPostalCode,
-        shippingCountry,
-      });
-      navigate(`/orders/${order.id}`, { replace: true });
+      const [order, config] = await Promise.all([
+        api.checkout({
+          shippingName,
+          shippingLine1,
+          shippingLine2: shippingLine2 || undefined,
+          shippingCity,
+          shippingPostalCode,
+          shippingCountry,
+        }),
+        api.paymentConfig(),
+      ]);
+
+      if (!order.razorpayOrderId) {
+        setError("Payment gateway unavailable. Order saved as pending.");
+        setPending(false);
+        return;
+      }
+
+      openRazorpay(order, config.razorpayKeyId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
-    } finally {
       setPending(false);
     }
   }
@@ -52,8 +116,7 @@ export function CheckoutPage() {
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:py-16">
       <h1 className="font-display text-4xl font-medium">Checkout</h1>
       <p className="mt-2 text-sm text-ink/50">
-        This flow captures shipping details and places a pending order (payment
-        integration can plug in next).
+        Enter your shipping details and complete payment via Razorpay.
       </p>
 
       {subtotal != null ? (
@@ -146,7 +209,7 @@ export function CheckoutPage() {
             Back to cart
           </Link>
           <Button type="submit" disabled={pending}>
-            {pending ? "Placing order…" : "Place order"}
+            {pending ? "Processing…" : "Pay Now"}
           </Button>
         </div>
       </form>

@@ -18,6 +18,7 @@ public record OrderDto(
         String shippingPostalCode,
         String shippingCountry,
         Instant createdAt,
+        String razorpayOrderId,
         List<OrderLineDto> lines
 ) {
 }

@@ -14,4 +14,7 @@ public interface OrderRepository extends JpaRepository<CustomerOrder, Long> {
 
     @EntityGraph(attributePaths = {"lines", "lines.product"})
     Optional<CustomerOrder> findByIdAndUser_Id(Long id, Long userId);
+
+    @EntityGraph(attributePaths = {"lines", "lines.product"})
+    Optional<CustomerOrder> findByRazorpayOrderId(String razorpayOrderId);
 }

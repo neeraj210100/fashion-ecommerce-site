@@ -3,6 +3,7 @@ package com.fashion.ecommerce.service;
 import com.fashion.ecommerce.dto.CheckoutRequest;
 import com.fashion.ecommerce.dto.OrderDto;
 import com.fashion.ecommerce.dto.OrderLineDto;
+import com.fashion.ecommerce.dto.PaymentVerifyRequest;
 import com.fashion.ecommerce.domain.Cart;
 import com.fashion.ecommerce.domain.CartItem;
 import com.fashion.ecommerce.domain.CustomerOrder;
@@ -32,17 +33,20 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+    private final PaymentService paymentService;
 
     public OrderService(
             OrderRepository orderRepository,
             CartRepository cartRepository,
             UserRepository userRepository,
-            ProductRepository productRepository
+            ProductRepository productRepository,
+            PaymentService paymentService
     ) {
         this.orderRepository = orderRepository;
         this.cartRepository = cartRepository;
         this.userRepository = userRepository;
         this.productRepository = productRepository;
+        this.paymentService = paymentService;
     }
 
     @Transactional
@@ -96,8 +100,11 @@ public class OrderService {
             p.setStock(p.getStock() - ci.getQuantity());
             productRepository.save(p);
         }
-//        cart.getItems().clear();
-//        cartRepository.save(cart);
+
+        String rzpOrderId = paymentService.createRazorpayOrder(total, order.getOrderNumber());
+        order.setRazorpayOrderId(rzpOrderId);
+        order = orderRepository.save(order);
+
         return toDto(order);
     }
 
@@ -110,6 +117,30 @@ public class OrderService {
     public OrderDto getForUser(Long userId, Long orderId) {
         return orderRepository.findByIdAndUser_Id(orderId, userId).map(this::toDto)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
+    }
+
+    @Transactional
+    public OrderDto verifyPayment(Long userId, PaymentVerifyRequest req) {
+        CustomerOrder order = orderRepository.findByRazorpayOrderId(req.razorpayOrderId())
+                .orElseThrow(() -> new NotFoundException("Order not found for Razorpay order ID"));
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("Order does not belong to current user");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BadRequestException("Order is not in PENDING state");
+        }
+
+        if (!paymentService.verifySignature(req.razorpayOrderId(), req.razorpayPaymentId(), req.razorpaySignature())) {
+            throw new BadRequestException("Invalid payment signature");
+        }
+
+        order.setRazorpayPaymentId(req.razorpayPaymentId());
+        order.setStatus(OrderStatus.PAID);
+        order = orderRepository.save(order);
+
+        return toDto(order);
     }
 
     @Transactional
@@ -151,6 +182,7 @@ public class OrderService {
                 o.getShippingPostalCode(),
                 o.getShippingCountry(),
                 o.getCreatedAt(),
+                o.getRazorpayOrderId(),
                 lineDtos
         );
     }
