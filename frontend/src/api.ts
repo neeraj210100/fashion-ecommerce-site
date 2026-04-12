@@ -7,6 +7,7 @@ import type {
   Product,
 } from "./types";
 
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 function getToken(): string | null {
@@ -35,7 +36,7 @@ async function request<T>(
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(path, {
+  const res = await fetch(API_BASE + path, {
     ...init,
     headers,
     body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
